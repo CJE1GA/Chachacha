@@ -58,6 +58,15 @@ class ChatbotTests(unittest.TestCase):
         self.assertIn("elige", messages[0]["text"]["body"].lower())
         self.assertEqual(get_session("test-unknown")["phase"], "welcome")
 
+    def test_privacy_page_is_public(self):
+        from app import app
+
+        client = app.test_client()
+        response = client.get("/privacy")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.content_type)
+        self.assertIn("Política de Privacidad", response.get_data(as_text=True))
+
 
 if __name__ == "__main__":
     unittest.main()

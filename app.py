@@ -408,5 +408,49 @@ def webhook():
     return "", 200
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "3000")))
+@app.get("/privacy")
+def privacy():
+    html = """<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Política de Privacidad | Full Training</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #222; }
+    h1, h2 { color: #111; }
+  </style>
+</head>
+<body>
+  <h1>Política de Privacidad</h1>
+  <p><strong>Última actualización:</strong> 24 de noviembre de 2026</p>
+
+  <h2>Responsable</h2>
+  <p>Full Training administra este chatbot de atención y registro mediante Instagram Direct.</p>
+
+  <h2>Información que recopilamos</h2>
+  <p>Cuando el usuario completa el registro, podemos recopilar nombre completo, número telefónico, correo electrónico, año de nacimiento, sucursal o programa de interés y el identificador técnico proporcionado por Meta para mantener la conversación.</p>
+
+  <h2>Uso de la información</h2>
+  <p>Los datos se usan para responder solicitudes, proporcionar información sobre sucursales y horarios, registrar interés comercial y permitir el seguimiento de atención por WhatsApp.</p>
+
+  <h2>Almacenamiento</h2>
+  <p>La información enviada al finalizar el registro puede almacenarse en Google Sheets mediante la integración autorizada. Los datos se conservan únicamente para fines de atención y gestión comercial.</p>
+
+  <h2>Servicios externos</h2>
+  <p>Este servicio utiliza Meta/Instagram Messaging para recibir y enviar mensajes y Google Sheets para almacenar los registros. Ambos servicios pueden aplicar sus propias políticas y medidas de seguridad.</p>
+
+  <h2>Eliminación de datos</h2>
+  <p>Para solicitar consulta, corrección o eliminación de datos, el usuario puede comunicarse con Full Training a través del canal de atención que recibió durante la conversación.</p>
+
+  <h2>Derechos del usuario</h2>
+  <p>El usuario puede solicitar acceso a sus datos, corrección de información incorrecta o eliminación de su registro.</p>
+
+  <h2>Seguridad</h2>
+  <p>Se utilizan comunicaciones HTTPS y credenciales administrativas protegidas para limitar el acceso a los datos. Ninguna clave secreta se publica en esta página.</p>
+
+  <h2>Cambios</h2>
+  <p>Esta política puede actualizarse cuando cambien el funcionamiento del chatbot o los servicios utilizados.</p>
+</body>
+</html>"""
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
