@@ -1,0 +1,18 @@
+Primero: El chatbot espera a un primer mensaje del usuario
+Segundo: El chatbot mandara el contenido del archivo llamado "mensaje_bienvenida.txt" dentro de la carpeta de Information->messages
+Tercero: El chatbot pondra cuatro botones de respuesta: "Guadalupe", "Bosque Santa Anita", "Wellness", "Hyrox"
+Cuarto: El chatbot esperara una respuesta del usuario identificando como palabras claves los botones del paso anterior, si detecta alguna palabra identica o parecida pasa al siguiente paso, sino el chatbot pedira de manera divertida, original y formal, que escoja alguna de las opciones.
+Quinto: El chat bot deber identificar la opcion del usuario:
+"Guadalupe": Mandara el contenido del archivo llamado "Horario_Guadalupe.txt" dentro de la carpeta de Information->messages y aparte la imagen llamada "precios_guadalupe.png" dentro de la carpeta de Information->images.
+"Bosque Santa Anita": Mandara el contenido del archivo llamado "Horario_bosque_Santa_Anita.txt" dentro de la carpeta de Information->messages y aparte la imagen llamada "precios_bosque_santa_anita.png" dentro de la carpeta de Information->images.
+"Hyrox": Mandara el contenido del archivo llamado "Hyrox.txt" dentro de la carpeta de Information->messages.
+"Wellness": Mandara la imagen llamada "precios_guadalupe.png" dentro de la carpeta de Information->images y un mensaje divertido y original diciendo que nuestra area wellness de Full solo esta disponible en la succursal Guadalupe.
+Sexto: Si la opcion escogida por el usuario es "Guadalupe", "Bosque Santa Anita" o "Wellness" debera realizer un registro al usuario, donde preguntara:
+- primero: Nombre complete
+- Segundo: Numero de telefono
+- Tercero: Email
+- Cuarto: Año de nacimiento
+Si la opcion escogida por el usuario es "Hyrox", debera preguntar de nuevo que sucursal le interesa y asi actualizar la opcion escogida por el usuario y regresar al quinto paso
+Septimo: El chat bot recopilara esa informacion dada y la pondra dentro del siguiente document compartido de google: "https://docs.google.com/spreadsheets/d/1SPN1cSyOCLA64mQTAhJXeXqEaK5DvH0CIyND48WXKh4/edit?gid=0#gid=0" ahi dentro acomodara la informacion dada, mas aparte del "Year", "Month", "Day" que se pidio la informacion y aparte de la opcion que escogio el usuario (opciones del tercer paso).
+Octavo: Despues del registro debera de ir al document llamado "Links.txt" dentro de la carpeta de Information->messages y debera identificar la opcion correcta de que link de WhatsApp pasar, eso dependera de la opcion del usuario y aparte un mensaje motivacional, divertida y original para que nos contacten por WhatsApp. 
+Noveno: Si el chatbot recibe una informacion que no sabe debera mandar el link correspondiente a la opcion escogida por el usuario y un mensaje divertida, original y formal de que mas informacion nos contacten por WhatsApp 

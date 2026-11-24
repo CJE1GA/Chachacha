@@ -1,0 +1,3 @@
+Guadalupe: "https://wa.me/523321647829?text=Hola%2C%20quiero%20mi%20clase%20muestra%20en%20Guadalupe"
+Santa Anita: "https://wa.me/523310749177?text=Hola%2C%20quiero%20mi%20clase%20muestra%20en%20Bosque%20Santa%20Anita"
+Wellness: "https://wa.me/523333021949?text=Hola%2C%20quiero%20agendar%20mi%20cita%20de%20Wellness"
