@@ -289,7 +289,7 @@ def process_incoming(text, selected_id, phone):
         return enter_option(session, phone)
 
     if session["phase"] == "offer_sample":
-        wants_sample = selected_id == "clase_muestra" or normalize(text) in {"quiero mi clase muestra", "clase muestra", "si", "sí", "quiero", "me interesa"}
+        wants_sample = selected_id == "clase_muestra" or normalize(text) in {"quiero mi clase muestra", "quiero clase muestra", "clase muestra", "si", "sí", "quiero", "me interesa"}
         if not wants_sample:
             return [{"type": "text", "text": {"body": "Te doy dos opciones claras: toca el botón para reservar tu clase muestra o dime “Quiero mi clase muestra”."}}, sample_class_menu()]
         session["phase"] = "register_name"
@@ -594,6 +594,6 @@ def sample_class_menu():
         "type": "button",
         "body": {"text": "¿Te gustaría reservar una clase muestra?"},
         "action": {"buttons": [
-            {"type": "reply", "reply": {"id": "clase_muestra", "title": "Quiero mi clase muestra"}}
+            {"type": "reply", "reply": {"id": "clase_muestra", "title": "Quiero clase muestra"}}
         ]}
     }}

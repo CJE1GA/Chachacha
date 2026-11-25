@@ -23,6 +23,32 @@ class MetaSendTests(unittest.TestCase):
         self.assertIn("graph.instagram.com/v27.0/ig-account/messages", args[0])
         self.assertEqual(kwargs["headers"]["Authorization"], "Bearer IG_TEST_TOKEN")
 
+    @patch.dict(os.environ, {
+            "META_ACCESS_TOKEN": "IG_TEST_TOKEN",
+            "META_INSTAGRAM_ACCOUNT_ID": "ig-account",
+            "META_GRAPH_HOST": "graph.instagram.com",
+        })
+    @patch("app.requests.post")
+    def test_sample_class_quick_reply_payload(self, post_mock):
+        post_mock.return_value.ok = True
+        post_mock.return_value.text = '{"recipient_id":"ig-user"}'
+        post_mock.return_value.raise_for_status.return_value = None
+
+        send_meta_messages("ig-user", [{
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {"text": "¿Te gustaría reservar una clase muestra?"},
+                "action": {"buttons": [{"type": "reply", "reply": {"id": "clase_muestra", "title": "Quiero clase muestra"}}]},
+            },
+        }])
+
+        args, kwargs = post_mock.call_args
+        self.assertIn("/messages", args[0])
+        quick_replies = kwargs["json"]["message"]["quick_replies"]
+        self.assertEqual(quick_replies[0]["payload"], "clase_muestra")
+        self.assertLessEqual(len(quick_replies[0]["title"]), 20)
+
 
 class GoogleSheetsTests(unittest.TestCase):
     @patch.dict(os.environ, {
