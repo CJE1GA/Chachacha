@@ -280,6 +280,17 @@ def health():
     return jsonify(status="ok")
 
 
+@app.get("/status")
+def status():
+    return jsonify(
+        status="ok",
+        instagram_configured=bool(os.getenv("META_ACCESS_TOKEN") and (os.getenv("META_INSTAGRAM_ACCOUNT_ID") or os.getenv("META_PAGE_ID"))),
+        webhook_signature_configured=bool(os.getenv("WEBHOOK_APP_SECRET")),
+        verify_token_configured=bool(os.getenv("VERIFY_TOKEN")),
+        google_sheets_configured=bool(os.getenv("GOOGLE_SHEET_WEBHOOK_URL") and os.getenv("GOOGLE_SHEET_TOKEN")),
+    )
+
+
 @app.get("/media/<filename>")
 def media(filename):
     if filename not in {"precios_guadalupe.png", "precios_bosque_santa_anita.png"}:
@@ -357,34 +368,51 @@ def send_meta_messages(instagram_id, messages):
             json=payload,
             timeout=10,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+            app.logger.info("Instagram message sent to %s: %s", instagram_id, response.text[:500])
+        except Exception:
+            app.logger.error("Instagram send failed to %s: HTTP %s body=%s", instagram_id, getattr(response, "status_code", "unknown"), getattr(response, "text", "")[:1000])
+            raise
 
 
 @app.post("/webhook")
 def webhook():
     raw = request.get_data(cache=True)
+    body = request.get_json(silent=True) or {}
+    app.logger.info("Instagram webhook received: entries=%s signature=%s", len(body.get("entry", [])), bool(request.headers.get("X-Hub-Signature-256")))
+
     if not valid_signature(raw):
+        app.logger.warning("Instagram webhook signature rejected")
         return "Forbidden", 403
 
-    body = request.get_json(silent=True) or {}
+    event_count = 0
     for entry in body.get("entry", []):
-        messaging_events = entry.get("messaging", [])
-        for change in entry.get("changes", []):
-            value = change.get("value", {})
-            messaging_events.extend(value.get("messaging", []))
+        messaging_events = list(entry.get("messaging", []) or [])
+        for change in entry.get("changes", []) or []:
+            value = change.get("value", {}) or {}
+            messaging_events.extend(value.get("messaging", []) or [])
+            for message in value.get("messages", []) or []:
+                messaging_events.append({
+                    "sender": {"id": str(message.get("from", ""))},
+                    "recipient": {"id": str(message.get("to", ""))},
+                    "message": {"text": message.get("text", {}).get("body", "")},
+                })
 
         for event in messaging_events:
+            event_count += 1
             if event.get("message", {}).get("is_echo"):
                 continue
 
-            sender = event.get("sender", {})
+            sender = event.get("sender", {}) or {}
             instagram_id = str(sender.get("id", ""))
             if not instagram_id:
+                app.logger.warning("Instagram webhook event without sender ID: %s", event)
                 continue
 
             text = ""
             selected_id = None
-            message = event.get("message", {})
+            message = event.get("message", {}) or {}
             text = message.get("text", "")
             quick_reply = message.get("quick_reply") or {}
             if quick_reply:
@@ -395,16 +423,21 @@ def webhook():
                 selected_id = postback.get("payload")
                 text = postback.get("title", text)
 
+            app.logger.info("Instagram message from %s: text=%r quick_reply=%r", instagram_id, text, selected_id)
             try:
                 replies = process_incoming(text, selected_id, instagram_id)
                 send_meta_messages(instagram_id, replies)
             except Exception:
                 app.logger.exception("Webhook processing failed")
-                send_meta_messages(instagram_id, [{
-                    "type": "text",
-                    "text": {"body": "Tuvimos un pequeño tropiezo técnico. Intenta de nuevo o escríbeme por aquí."},
-                }])
+                try:
+                    send_meta_messages(instagram_id, [{
+                        "type": "text",
+                        "text": {"body": "Tuvimos un pequeño tropiezo técnico. Intenta de nuevo o escríbeme por aquí."},
+                    }])
+                except Exception:
+                    app.logger.exception("Could not send webhook fallback message")
 
+    app.logger.info("Instagram webhook processed: events=%s", event_count)
     return "", 200
 
 

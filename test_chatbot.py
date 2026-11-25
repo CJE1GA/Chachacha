@@ -67,6 +67,30 @@ class ChatbotTests(unittest.TestCase):
         self.assertIn("text/html", response.content_type)
         self.assertIn("Política de Privacidad", response.get_data(as_text=True))
 
+    def test_status_endpoint(self):
+        from app import app
+
+        response = app.test_client().get("/status")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("instagram_configured", response.get_json())
+
+    @patch("app.send_meta_messages")
+    def test_instagram_webhook_accepts_messaging_event(self, send_mock):
+        from app import app
+
+        payload = {
+            "object": "instagram",
+            "entry": [{
+                "messaging": [{
+                    "sender": {"id": "ig-test-sender"},
+                    "recipient": {"id": "ig-test-account"},
+                    "message": {"text": "Guadalupe", "mid": "test-mid"},
+                }]
+            }]
+        }
+        response = app.test_client().post("/webhook", json=payload)
+        self.assertEqual(response.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
