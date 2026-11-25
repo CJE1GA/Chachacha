@@ -28,6 +28,7 @@ for label, url in re.findall(r'(Guadalupe|Santa Anita|Wellness):\s*"([^"]+)"', l
     links[re.sub(r"\s+", " ", label).strip().lower()] = url
 
 sessions = {}
+seen_webhook_messages = set()
 sessions_lock = threading.Lock()
 
 
@@ -363,7 +364,7 @@ def send_meta_messages(instagram_id, messages):
             continue
 
         response = requests.post(
-            f"https://graph.facebook.com/v23.0/{instagram_account_id}/messages",
+            f"https://graph.facebook.com/v27.0/{instagram_account_id}/messages",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json=payload,
             timeout=10,
@@ -404,6 +405,16 @@ def webhook():
             if event.get("message", {}).get("is_echo"):
                 continue
 
+            message = event.get("message", {}) or {}
+            message_id = str(message.get("mid") or message.get("message_id") or "")
+            if message_id:
+                if message_id in seen_webhook_messages:
+                    app.logger.info("Duplicate Instagram webhook message ignored: %s", message_id)
+                    continue
+                seen_webhook_messages.add(message_id)
+                if len(seen_webhook_messages) > 5000:
+                    seen_webhook_messages.clear()
+
             sender = event.get("sender", {}) or {}
             instagram_id = str(sender.get("id", ""))
             if not instagram_id:
@@ -426,9 +437,8 @@ def webhook():
             app.logger.info("Instagram message from %s: text=%r quick_reply=%r", instagram_id, text, selected_id)
             try:
                 replies = process_incoming(text, selected_id, instagram_id)
-                send_meta_messages(instagram_id, replies)
             except Exception:
-                app.logger.exception("Webhook processing failed")
+                app.logger.exception("Webhook conversation processing failed")
                 try:
                     send_meta_messages(instagram_id, [{
                         "type": "text",
@@ -436,6 +446,12 @@ def webhook():
                     }])
                 except Exception:
                     app.logger.exception("Could not send webhook fallback message")
+                continue
+
+            try:
+                send_meta_messages(instagram_id, replies)
+            except Exception:
+                app.logger.exception("Could not send Instagram reply; no fallback loop will be started")
 
     app.logger.info("Instagram webhook processed: events=%s", event_count)
     return "", 200
