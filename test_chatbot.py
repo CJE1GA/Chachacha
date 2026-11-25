@@ -101,7 +101,10 @@ class ChatbotTests(unittest.TestCase):
             }]
         }
         response = app.test_client().post("/webhook", json=payload)
+        duplicate_response = app.test_client().post("/webhook", json=payload)
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(duplicate_response.status_code, 200)
+        self.assertEqual(send_mock.call_count, 1)
 
     @patch.dict(os.environ, {
             "META_ACCESS_TOKEN": "  IG_SINGLE_TOKEN  ",
@@ -123,6 +126,21 @@ class ChatbotTests(unittest.TestCase):
         response = app.test_client().get("/status")
         self.assertEqual(response.status_code, 200)
         self.assertIn("instagram_configured", response.get_json())
+
+    def test_hola_does_not_enter_guadalupe(self):
+        phone = "test-hola-loop"
+        first = process_incoming("Hola", None, phone)
+        second = process_incoming("Hola", None, phone)
+        self.assertIn("Bienvenido", first[0]["text"]["body"])
+        self.assertIn("Elige", second[1]["interactive"]["body"]["text"])
+        self.assertEqual(get_session(phone)["phase"], "welcome")
+
+    def test_greeting_resets_stale_registration(self):
+        phone = "test-stale-registration"
+        process_incoming("Guadalupe", None, phone)
+        messages = process_incoming("Hola", None, phone)
+        self.assertIn("Bienvenido", messages[0]["text"]["body"])
+        self.assertEqual(get_session(phone)["phase"], "welcome")
 
 
 if __name__ == "__main__":

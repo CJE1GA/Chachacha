@@ -254,7 +254,8 @@ def process_incoming(text, selected_id, phone):
     session = get_session(phone)
     text = (text or "").strip()
 
-    if re.fullmatch(r"(?i)(reiniciar|reset|inicio|menu|menú)", text) or selected_id == "menu":
+    normalized_reset = normalize(text)
+    if normalized_reset in {"reiniciar", "reset", "inicio", "menu", "menu principal", "hola", "holaa", "hola buenos dias", "buenos dias", "buenas tardes", "buenas noches", "hey", "hi"} or selected_id == "menu":
         reset_session(phone)
         session = get_session(phone)
         session["greeted"] = True
@@ -456,38 +457,46 @@ def webhook():
         for change in entry.get("changes", []) or []:
             value = change.get("value", {}) or {}
             messaging_events.extend(value.get("messaging", []) or [])
-            for message in value.get("messages", []) or []:
-                messaging_events.append({
-                    "sender": {"id": str(message.get("from", ""))},
-                    "recipient": {"id": str(message.get("to", ""))},
-                    "message": {"text": message.get("text", {}).get("body", "")},
-                })
 
         for event in messaging_events:
             event_count += 1
             if event.get("message", {}).get("is_echo"):
                 continue
+            if any(field in event for field in ("delivery", "read", "reaction")):
+                continue
+
+            sender = event.get("sender", {}) or {}
+            recipient = event.get("recipient", {}) or {}
+            instagram_id = str(sender.get("id", ""))
+            account_id = str(recipient.get("id", ""))
 
             message = event.get("message", {}) or {}
             message_id = str(message.get("mid") or message.get("message_id") or "")
-            if message_id:
-                if message_id in seen_webhook_messages:
-                    app.logger.info("Duplicate Instagram webhook message ignored: %s", message_id)
-                    continue
-                seen_webhook_messages.add(message_id)
-                if len(seen_webhook_messages) > 5000:
-                    seen_webhook_messages.clear()
+            timestamp = str(event.get("timestamp") or "")
+            fallback_key = "|".join((
+                instagram_id,
+                account_id,
+                timestamp,
+                message_id,
+                str(message.get("text", "")),
+                str(message.get("quick_reply", {}).get("payload", "")),
+                str(event.get("postback", {}).get("payload", "")),
+            ))
 
-            sender = event.get("sender", {}) or {}
-            instagram_id = str(sender.get("id", ""))
+            dedupe_key = message_id or fallback_key
+            if dedupe_key in seen_webhook_messages:
+                app.logger.info("Duplicate Instagram webhook message ignored: %s", dedupe_key)
+                continue
+            seen_webhook_messages.add(dedupe_key)
+            if len(seen_webhook_messages) > 5000:
+                seen_webhook_messages.clear()
+
             if not instagram_id:
                 app.logger.warning("Instagram webhook event without sender ID: %s", event)
                 continue
 
-            text = ""
+            text = str(message.get("text", "") or "")
             selected_id = None
-            message = event.get("message", {}) or {}
-            text = message.get("text", "")
             quick_reply = message.get("quick_reply") or {}
             if quick_reply:
                 selected_id = quick_reply.get("payload")
