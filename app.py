@@ -178,19 +178,19 @@ def enter_option(session, phone):
     option = session["option"]
 
     if option == "guadalupe":
-        session["phase"] = "register_name"
+        session["phase"] = "offer_sample"
         result = [{"type": "text", "text": {"body": GUADALUPE}}]
         if base:
             result.append({"type": "image", "image": {"link": f"{base}/media/precios_guadalupe.png", "caption": "Precios de Guadalupe"}})
-        result.append({"type": "text", "text": {"body": "¡Gran elección! Primero hagamos tu registro rápido. ¿Cuál es tu nombre completo?"}})
+        result.append(sample_class_menu())
         return result
 
     if option == "santa_anita":
-        session["phase"] = "register_name"
+        session["phase"] = "offer_sample"
         result = [{"type": "text", "text": {"body": SANTA_ANITA}}]
         if base:
             result.append({"type": "image", "image": {"link": f"{base}/media/precios_bosque_santa_anita.png", "caption": "Precios de Bosque Santa Anita"}})
-        result.append({"type": "text", "text": {"body": "¡Excelente! Vamos con tu registro. ¿Cuál es tu nombre completo?"}})
+        result.append(sample_class_menu())
         return result
 
     if option == "wellness":
@@ -255,6 +255,11 @@ def process_incoming(text, selected_id, phone):
     text = (text or "").strip()
 
     normalized_reset = normalize(text)
+    thanks = ("gracias", "muchas gracias", "mil gracias", "te agradezco", "gracias por todo")
+    if normalized_reset in thanks or normalized_reset.startswith(thanks) or any(phrase in normalized_reset for phrase in ("muchas gracias", "mil gracias", "gracias por")):
+        reset_session(phone)
+        return [{"type": "text", "text": {"body": "¡Un gusto ayudarte! Gracias a ti por confiar en Full Training. Que tengas un excelente día y aquí estaremos para entrenar contigo 💪 ¡Hasta pronto!"}}]
+
     if normalized_reset in {"reiniciar", "reset", "inicio", "menu", "menu principal", "hola", "holaa", "hola buenos dias", "buenos dias", "buenas tardes", "buenas noches", "hey", "hi"} or selected_id == "menu":
         reset_session(phone)
         session = get_session(phone)
@@ -282,6 +287,13 @@ def process_incoming(text, selected_id, phone):
             return [{"type": "text", "text": {"body": "Elige una sucursal para que te muestre horarios y precios."}}, branch_menu()]
         session["option"] = branch
         return enter_option(session, phone)
+
+    if session["phase"] == "offer_sample":
+        wants_sample = selected_id == "clase_muestra" or normalize(text) in {"quiero mi clase muestra", "clase muestra", "si", "sí", "quiero", "me interesa"}
+        if not wants_sample:
+            return [{"type": "text", "text": {"body": "Te doy dos opciones claras: toca el botón para reservar tu clase muestra o dime “Quiero mi clase muestra”."}}, sample_class_menu()]
+        session["phase"] = "register_name"
+        return [{"type": "text", "text": {"body": "¡Perfecto! Vamos a registrar tu clase muestra. ¿Cuál es tu nombre completo?"}}]
 
     if session["phase"].startswith("register_"):
         return collect_registration(session, text, phone)
@@ -575,3 +587,13 @@ def privacy():
 </body>
 </html>"""
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+def sample_class_menu():
+    return {"type": "interactive", "interactive": {
+        "type": "button",
+        "body": {"text": "¿Te gustaría reservar una clase muestra?"},
+        "action": {"buttons": [
+            {"type": "reply", "reply": {"id": "clase_muestra", "title": "Quiero mi clase muestra"}}
+        ]}
+    }}

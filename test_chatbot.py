@@ -61,10 +61,22 @@ class ChatbotTests(unittest.TestCase):
 
     def test_guadalupe_registers(self):
         process_incoming("Guadalupe", None, "test-guadalupe")
+        sample = process_incoming("Quiero mi clase muestra", "clase_muestra", "test-guadalupe")
+        self.assertIn("nombre completo", sample[0]["text"]["body"])
         invalid = process_incoming("Ana", None, "test-guadalupe")
         self.assertIn("nombre completo", invalid[0]["text"]["body"])
         valid = process_incoming("Ana López", None, "test-guadalupe")
         self.assertIn("teléfono", valid[0]["text"]["body"])
+
+    def test_santa_anita_requests_sample_before_registration(self):
+        phone = "test-santa-anita"
+        process_incoming("Santa Anita", None, phone)
+        messages = process_incoming("Quiero mi clase muestra", "clase_muestra", phone)
+        self.assertIn("nombre completo", messages[0]["text"]["body"])
+
+    def test_thanks_farewell(self):
+        messages = process_incoming("Muchas gracias", None, "test-thanks")
+        self.assertIn("Hasta pronto", messages[0]["text"]["body"])
 
     def test_hyrox_branch(self):
         process_incoming("Inicio", None, "test-hyrox")
