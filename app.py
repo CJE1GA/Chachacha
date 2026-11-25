@@ -32,6 +32,27 @@ seen_webhook_messages = set()
 sessions_lock = threading.Lock()
 
 
+def meta_access_token():
+    for name in ("META_ACCESS_TOKEN", "META_INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCESS_TOKEN"):
+        value = os.getenv(name, "").strip().strip('"').strip("'")
+        if value:
+            return value
+    return ""
+
+
+def meta_instagram_account_id():
+    for name in ("META_INSTAGRAM_ACCOUNT_ID", "INSTAGRAM_ACCOUNT_ID", "META_PAGE_ID", "PAGE_ID"):
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def meta_graph_host():
+    value = os.getenv("META_GRAPH_HOST", "graph.instagram.com").strip().rstrip("/")
+    return value.replace("https://", "").replace("http://", "")
+
+
 def normalize(text):
     text = text.lower().strip()
     replacements = str.maketrans("áéíóúüñ", "aeiouun")
@@ -283,14 +304,43 @@ def health():
 
 @app.get("/status")
 def status():
+    token = meta_access_token()
+    account_id = meta_instagram_account_id()
     return jsonify(
         status="ok",
-        instagram_configured=bool(os.getenv("META_ACCESS_TOKEN", "").strip() and "replace-with" not in os.getenv("META_ACCESS_TOKEN", "").lower() and (os.getenv("META_INSTAGRAM_ACCOUNT_ID") or os.getenv("META_PAGE_ID"))),
+        instagram_configured=bool(token and "replace-with" not in token.lower() and account_id),
+        token_present=bool(token),
+        token_length=len(token),
+        account_id_present=bool(account_id),
         webhook_signature_configured=bool(os.getenv("WEBHOOK_APP_SECRET")),
         verify_token_configured=bool(os.getenv("VERIFY_TOKEN")),
         google_sheets_configured=bool(os.getenv("GOOGLE_SHEET_WEBHOOK_URL") and os.getenv("GOOGLE_SHEET_TOKEN")),
-        meta_graph_host=os.getenv("META_GRAPH_HOST", "graph.instagram.com"),
+        meta_graph_host=meta_graph_host(),
     )
+
+
+@app.get("/diagnostics/meta")
+def meta_diagnostics():
+    token = meta_access_token()
+    if not token:
+        return jsonify(ok=False, error="missing_access_token"), 200
+    if "replace-with" in token.lower():
+        return jsonify(ok=False, error="placeholder_access_token"), 200
+
+    host = meta_graph_host()
+    try:
+        response = requests.get(
+            f"https://{host}/v27.0/me",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if not response.ok:
+            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            return jsonify(ok=False, http_status=response.status_code, meta_error=(data.get("error") or {}).get("message", response.text[:300])), 200
+        data = response.json()
+        return jsonify(ok=True, http_status=response.status_code, account_name=data.get("name"), account_id=data.get("id")), 200
+    except Exception as error:
+        return jsonify(ok=False, error="request_failed", detail=str(error)), 200
 
 
 @app.get("/media/<filename>")
@@ -319,16 +369,15 @@ def valid_signature(raw_body):
 
 
 def send_meta_messages(instagram_id, messages):
-    token = os.getenv("META_ACCESS_TOKEN", "").strip().strip('"').strip("'")
-    instagram_account_id = os.getenv("META_INSTAGRAM_ACCOUNT_ID", "").strip() or os.getenv("META_PAGE_ID", "").strip()
-    graph_host = os.getenv("META_GRAPH_HOST", "graph.instagram.com").strip().rstrip("/")
-    graph_host = graph_host.replace("https://", "").replace("http://", "")
+    token = meta_access_token()
+    instagram_account_id = meta_instagram_account_id()
+    graph_host = meta_graph_host()
 
     if not token or "replace-with" in token.lower():
-        app.logger.error("META_ACCESS_TOKEN is missing or still contains a placeholder")
+        app.logger.error("META_ACCESS_TOKEN/META_INSTAGRAM_ACCESS_TOKEN is missing or still contains a placeholder")
         return
     if not instagram_account_id:
-        app.logger.error("META_INSTAGRAM_ACCOUNT_ID or META_PAGE_ID is missing")
+        app.logger.error("META_INSTAGRAM_ACCOUNT_ID, INSTAGRAM_ACCOUNT_ID or META_PAGE_ID is missing")
         return
 
     for message in messages:

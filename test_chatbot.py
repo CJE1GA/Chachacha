@@ -86,13 +86,6 @@ class ChatbotTests(unittest.TestCase):
         self.assertIn("text/html", response.content_type)
         self.assertIn("Política de Privacidad", response.get_data(as_text=True))
 
-    def test_status_endpoint(self):
-        from app import app
-
-        response = app.test_client().get("/status")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("instagram_configured", response.get_json())
-
     @patch("app.send_meta_messages")
     def test_instagram_webhook_accepts_messaging_event(self, send_mock):
         from app import app
@@ -109,6 +102,27 @@ class ChatbotTests(unittest.TestCase):
         }
         response = app.test_client().post("/webhook", json=payload)
         self.assertEqual(response.status_code, 200)
+
+    @patch.dict(os.environ, {
+            "META_INSTAGRAM_ACCESS_TOKEN": "  IG_ALIAS_TOKEN  ",
+            "INSTAGRAM_ACCOUNT_ID": "ig-alias-account",
+            "META_GRAPH_HOST": "graph.instagram.com",
+        }, clear=False)
+    def test_alias_credentials_status(self):
+        from app import app
+
+        response = app.test_client().get("/status")
+        data = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data["token_present"])
+        self.assertTrue(data["account_id_present"])
+
+    def test_status_endpoint(self):
+        from app import app
+
+        response = app.test_client().get("/status")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("instagram_configured", response.get_json())
 
 
 if __name__ == "__main__":
