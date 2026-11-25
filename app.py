@@ -33,11 +33,7 @@ sessions_lock = threading.Lock()
 
 
 def meta_access_token():
-    for name in ("META_ACCESS_TOKEN", "META_INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCESS_TOKEN"):
-        value = os.getenv(name, "").strip().strip('"').strip("'")
-        if value:
-            return value
-    return ""
+    return os.getenv("META_ACCESS_TOKEN", "").strip().strip('"').strip("'")
 
 
 def meta_instagram_account_id():
@@ -374,7 +370,7 @@ def send_meta_messages(instagram_id, messages):
     graph_host = meta_graph_host()
 
     if not token or "replace-with" in token.lower():
-        app.logger.error("META_ACCESS_TOKEN/META_INSTAGRAM_ACCESS_TOKEN is missing or still contains a placeholder")
+        app.logger.error("META_ACCESS_TOKEN is missing or still contains a placeholder")
         return
     if not instagram_account_id:
         app.logger.error("META_INSTAGRAM_ACCOUNT_ID, INSTAGRAM_ACCOUNT_ID or META_PAGE_ID is missing")

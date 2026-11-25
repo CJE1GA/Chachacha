@@ -104,11 +104,11 @@ class ChatbotTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     @patch.dict(os.environ, {
-            "META_INSTAGRAM_ACCESS_TOKEN": "  IG_ALIAS_TOKEN  ",
-            "INSTAGRAM_ACCOUNT_ID": "ig-alias-account",
+            "META_ACCESS_TOKEN": "  IG_SINGLE_TOKEN  ",
+            "META_INSTAGRAM_ACCOUNT_ID": "ig-single-account",
             "META_GRAPH_HOST": "graph.instagram.com",
         }, clear=False)
-    def test_alias_credentials_status(self):
+    def test_single_token_status(self):
         from app import app
 
         response = app.test_client().get("/status")
