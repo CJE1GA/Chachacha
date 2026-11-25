@@ -300,7 +300,7 @@ def process_incoming(text, selected_id, phone):
 
     if session["phase"] == "complete":
         link = link_for(session["option"])
-        return [{"type": "text", "text": {"body": f"Ya quedó tu registro en modo “lista para entrenar” 😄 Para confirmar disponibilidad, precios o resolver cualquier duda, escríbnos por WhatsApp:\n{link}"}}]
+        return [{"type": "text", "text": {"body": f"Ya quedó tu registro en modo “lista para entrenar” 😄 Para confirmar disponibilidad, precios o resolver cualquier duda, escríbenos por WhatsApp:\n{link}"}}]
 
     link = link_for(session["option"])
     return [{"type": "text", "text": {"body": "No tengo esa respuesta registrada, pero sí tengo el camino directo a nuestro equipo. Escríbenos por WhatsApp:"}}, {"type": "text", "text": {"body": link}}]
