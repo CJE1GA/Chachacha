@@ -285,11 +285,11 @@ def health():
 def status():
     return jsonify(
         status="ok",
-        instagram_configured=bool(os.getenv("META_ACCESS_TOKEN") and (os.getenv("META_INSTAGRAM_ACCOUNT_ID") or os.getenv("META_PAGE_ID"))),
+        instagram_configured=bool(os.getenv("META_ACCESS_TOKEN", "").strip() and "replace-with" not in os.getenv("META_ACCESS_TOKEN", "").lower() and (os.getenv("META_INSTAGRAM_ACCOUNT_ID") or os.getenv("META_PAGE_ID"))),
         webhook_signature_configured=bool(os.getenv("WEBHOOK_APP_SECRET")),
         verify_token_configured=bool(os.getenv("VERIFY_TOKEN")),
         google_sheets_configured=bool(os.getenv("GOOGLE_SHEET_WEBHOOK_URL") and os.getenv("GOOGLE_SHEET_TOKEN")),
-        meta_graph_host=os.getenv("META_GRAPH_HOST", "graph.facebook.com"),
+        meta_graph_host=os.getenv("META_GRAPH_HOST", "graph.instagram.com"),
     )
 
 
@@ -319,10 +319,17 @@ def valid_signature(raw_body):
 
 
 def send_meta_messages(instagram_id, messages):
-    token = os.getenv("META_ACCESS_TOKEN")
-    instagram_account_id = os.getenv("META_INSTAGRAM_ACCOUNT_ID") or os.getenv("META_PAGE_ID")
-    graph_host = os.getenv("META_GRAPH_HOST", "graph.facebook.com").strip().rstrip("/")
+    token = os.getenv("META_ACCESS_TOKEN", "").strip().strip('"').strip("'")
+    instagram_account_id = os.getenv("META_INSTAGRAM_ACCOUNT_ID", "").strip() or os.getenv("META_PAGE_ID", "").strip()
+    graph_host = os.getenv("META_GRAPH_HOST", "graph.instagram.com").strip().rstrip("/")
     graph_host = graph_host.replace("https://", "").replace("http://", "")
+
+    if not token or "replace-with" in token.lower():
+        app.logger.error("META_ACCESS_TOKEN is missing or still contains a placeholder")
+        return
+    if not instagram_account_id:
+        app.logger.error("META_INSTAGRAM_ACCOUNT_ID or META_PAGE_ID is missing")
+        return
 
     for message in messages:
         payload = {"recipient": {"id": instagram_id}}

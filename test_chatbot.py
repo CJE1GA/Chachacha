@@ -2,7 +2,26 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app import append_registration, process_incoming, get_session
+from app import append_registration, process_incoming, get_session, send_meta_messages
+
+
+class MetaSendTests(unittest.TestCase):
+    @patch.dict(os.environ, {
+        "META_ACCESS_TOKEN": '  "IG_TEST_TOKEN"  ',
+        "META_INSTAGRAM_ACCOUNT_ID": "ig-account",
+        "META_GRAPH_HOST": "graph.instagram.com",
+    })
+    @patch("app.requests.post")
+    def test_instagram_login_payload(self, post_mock):
+        post_mock.return_value.ok = True
+        post_mock.return_value.text = '{"recipient_id":"ig-user"}'
+        post_mock.return_value.raise_for_status.return_value = None
+
+        send_meta_messages("ig-user", [{"type": "text", "text": {"body": "Hola"}}])
+
+        args, kwargs = post_mock.call_args
+        self.assertIn("graph.instagram.com/v27.0/ig-account/messages", args[0])
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer IG_TEST_TOKEN")
 
 
 class GoogleSheetsTests(unittest.TestCase):
