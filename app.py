@@ -194,11 +194,9 @@ def enter_option(session, phone):
         return result
 
     if option == "wellness":
-        session["phase"] = "register_name"
-        result = [{"type": "text", "text": {"body": "Nuestro espacio Wellness de Full solo está disponible en la sucursal Guadalupe. ¡Es momento de darle balance a tanta fuerza! 🧘💪"}}]
-        if base:
-            result.append({"type": "image", "image": {"link": f"{base}/media/precios_guadalupe.png", "caption": "Precios de Guadalupe"}})
-        result.append({"type": "text", "text": {"body": "Para registrarte en Wellness y comenzar tu plan, dime tu nombre completo."}})
+        session["phase"] = "offer_wellness"
+        result = [{"type": "text", "text": {"body": "Nuestro rincón Wellness está en Guadalupe, esperando a que le des una pausa a tanto ardor fitness 🧘✨ Aquí recargas cuerpo y mente, sin prisas y con buena vibra. ¿Te agendamos una cita?"}}]
+        result.append(wellness_appointment_menu())
         return result
 
     if option == "hyrox":
@@ -257,7 +255,10 @@ def process_incoming(text, selected_id, phone):
     normalized_reset = normalize(text)
     thanks = ("gracias", "muchas gracias", "mil gracias", "te agradezco", "gracias por todo")
     if normalized_reset in thanks or normalized_reset.startswith(thanks) or any(phrase in normalized_reset for phrase in ("muchas gracias", "mil gracias", "gracias por")):
+        previous_option = session.get("option")
         reset_session(phone)
+        if previous_option == "wellness":
+            return [{"type": "text", "text": {"body": "¡A tu ritmo, siempre! Gracias por confiar en nuestro espacio Wellness. Que tu día tenga mucho equilibrio, buena vibra y una dosis de calma 🧘✨ ¡Hasta tu cita!"}}]
         return [{"type": "text", "text": {"body": "¡Un gusto ayudarte! Gracias a ti por confiar en Full Training. Que tengas un excelente día y aquí estaremos para entrenar contigo 💪 ¡Hasta pronto!"}}]
 
     if normalized_reset in {"reiniciar", "reset", "inicio", "menu", "menu principal", "hola", "holaa", "hola buenos dias", "buenos dias", "buenas tardes", "buenas noches", "hey", "hi"} or selected_id == "menu":
@@ -294,6 +295,13 @@ def process_incoming(text, selected_id, phone):
             return [{"type": "text", "text": {"body": "Te doy dos opciones claras: toca el botón para reservar tu clase muestra o dime “Quiero mi clase muestra”."}}, sample_class_menu()]
         session["phase"] = "register_name"
         return [{"type": "text", "text": {"body": "¡Perfecto! Vamos a registrar tu clase muestra. ¿Cuál es tu nombre completo?"}}]
+
+    if session["phase"] == "offer_wellness":
+        wants_appointment = selected_id == "agendar_cita_wellness" or normalize(text) in {"quiero agendar cita", "agendar cita", "cita wellness", "si", "sí", "quiero", "me interesa"}
+        if not wants_appointment:
+            return [{"type": "text", "text": {"body": "Sin estrés: toca “Quiero agendar cita” o escríbeme “Quiero agendar cita” y te doy el siguiente paso."}}, wellness_appointment_menu()]
+        session["phase"] = "register_name"
+        return [{"type": "text", "text": {"body": "¡Cita en camino! Para apartarla con calma, ¿cuál es tu nombre completo?"}}]
 
     if session["phase"].startswith("register_"):
         return collect_registration(session, text, phone)
@@ -595,5 +603,15 @@ def sample_class_menu():
         "body": {"text": "¿Te gustaría reservar una clase muestra?"},
         "action": {"buttons": [
             {"type": "reply", "reply": {"id": "clase_muestra", "title": "Quiero clase muestra"}}
+        ]}
+    }}
+
+
+def wellness_appointment_menu():
+    return {"type": "interactive", "interactive": {
+        "type": "button",
+        "body": {"text": "¿List@ para una cita de Wellness?"},
+        "action": {"buttons": [
+            {"type": "reply", "reply": {"id": "agendar_cita_wellness", "title": "Quiero agendar cita"}}
         ]}
     }}

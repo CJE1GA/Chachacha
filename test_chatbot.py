@@ -180,6 +180,21 @@ class ChatbotTests(unittest.TestCase):
         self.assertIn("Bienvenido", messages[0]["text"]["body"])
         self.assertEqual(get_session(phone)["phase"], "welcome")
 
+    def test_wellness_requests_appointment_before_registration(self):
+        phone = "test-wellness"
+        result = process_incoming("Wellness", None, phone)
+        self.assertEqual(len(result), 2)
+        self.assertIn("rincón Wellness", result[0]["text"]["body"])
+
+        appointment = process_incoming("Quiero agendar cita", "agendar_cita_wellness", phone)
+        self.assertIn("nombre completo", appointment[0]["text"]["body"])
+
+    def test_wellness_thanks_farewell(self):
+        phone = "test-wellness-thanks"
+        process_incoming("Wellness", None, phone)
+        messages = process_incoming("Muchas gracias", None, phone)
+        self.assertIn("Hasta tu cita", messages[0]["text"]["body"])
+
 
 if __name__ == "__main__":
     unittest.main()
