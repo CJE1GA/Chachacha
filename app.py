@@ -289,6 +289,7 @@ def status():
         webhook_signature_configured=bool(os.getenv("WEBHOOK_APP_SECRET")),
         verify_token_configured=bool(os.getenv("VERIFY_TOKEN")),
         google_sheets_configured=bool(os.getenv("GOOGLE_SHEET_WEBHOOK_URL") and os.getenv("GOOGLE_SHEET_TOKEN")),
+        meta_graph_host=os.getenv("META_GRAPH_HOST", "graph.facebook.com"),
     )
 
 
@@ -320,9 +321,8 @@ def valid_signature(raw_body):
 def send_meta_messages(instagram_id, messages):
     token = os.getenv("META_ACCESS_TOKEN")
     instagram_account_id = os.getenv("META_INSTAGRAM_ACCOUNT_ID") or os.getenv("META_PAGE_ID")
-    if not token or not instagram_account_id:
-        app.logger.warning("Instagram credentials are not configured; outbound message skipped.")
-        return
+    graph_host = os.getenv("META_GRAPH_HOST", "graph.facebook.com").strip().rstrip("/")
+    graph_host = graph_host.replace("https://", "").replace("http://", "")
 
     for message in messages:
         payload = {"recipient": {"id": instagram_id}}
@@ -363,18 +363,29 @@ def send_meta_messages(instagram_id, messages):
         if "message" not in payload:
             continue
 
+        app.logger.info("Sending Instagram %s message to %s", message.get("type"), instagram_id)
         response = requests.post(
-            f"https://graph.facebook.com/v27.0/{instagram_account_id}/messages",
+            f"https://{graph_host}/v27.0/{instagram_account_id}/messages",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json=payload,
             timeout=10,
         )
+        if not response.ok and message.get("type") == "image":
+            image_url = message["image"]["link"]
+            app.logger.warning("Image retry for %s using attachments format", image_url)
+            payload["message"] = {"attachments": {"type": "image", "payload": {"url": image_url}}}
+            response = requests.post(
+                f"https://{graph_host}/v27.0/{instagram_account_id}/messages",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=10,
+            )
         try:
             response.raise_for_status()
             app.logger.info("Instagram message sent to %s: %s", instagram_id, response.text[:500])
         except Exception:
             app.logger.error("Instagram send failed to %s: HTTP %s body=%s", instagram_id, getattr(response, "status_code", "unknown"), getattr(response, "text", "")[:1000])
-            raise
+            continue
 
 
 @app.post("/webhook")
