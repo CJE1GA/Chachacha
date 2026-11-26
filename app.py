@@ -213,6 +213,70 @@ def append_registration(registration, option, identifier):
     return payload
 
 
+def wellness_sheet_request(action, lead=None, **fields):
+    url = os.getenv("GOOGLE_SHEET_WEBHOOK_URL")
+    if not url:
+        raise RuntimeError("missing_google_sheet_webhook")
+    payload = {
+        "action": action,
+        "token": os.getenv("GOOGLE_SHEET_TOKEN", "0710"),
+        "sheet": "Wellness",
+        **fields,
+    }
+    if lead:
+        payload["lead"] = lead
+    response = requests.post(url, json=payload, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+    if not data.get("ok"):
+        raise RuntimeError(data.get("error", "wellness_sheet_rejected_payload"))
+    return data
+
+
+def get_wellness_slots():
+    data = wellness_sheet_request("list_wellness_slots")
+    return data.get("slots", [])
+
+
+def reserve_wellness_slot(slot, registration, identifier):
+    return wellness_sheet_request(
+        "reserve_wellness_slot",
+        lead={"name": registration["name"]},
+        day=slot["day"],
+        time=slot["time"],
+        row=slot.get("row"),
+        identifier=str(identifier),
+    )
+
+
+def format_wellness_slots(slots):
+    if not slots:
+        return "Por ahora no quedan horarios Wellness disponibles."
+    grouped = {}
+    for slot in slots:
+        grouped.setdefault(slot["day"], []).append(slot["time"])
+    lines = ["Estos son los horarios Wellness disponibles, a tu ritmo 🧘✨"]
+    for day, times in grouped.items():
+        lines.append(f"{day}: " + " | ".join(times))
+    lines.append("Responde con el día y la hora que prefieras, por ejemplo: Martes 10:00.")
+    return "\n".join(lines)
+
+
+def find_wellness_slot(text, slots):
+    normalized_text = normalize(text)
+    compact_text = re.sub(r"[^0-9]", "", text)
+
+    for slot in slots:
+        day = normalize(slot["day"])
+        slot_time = str(slot["time"]).strip()
+        compact_slot_time = re.sub(r"[^0-9]", "", slot_time)
+        if day not in normalized_text:
+            continue
+        if compact_text and (compact_text in compact_slot_time or compact_slot_time.startswith(compact_text)):
+            return slot
+    return None
+
+
 def enter_option(session, phone):
     base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
     option = session["option"]
@@ -275,7 +339,6 @@ def collect_registration(session, text, identifier):
         if not valid_birth_year(text):
             return [{"type": "text", "text": {"body": "¡Ya casi terminamos! Escribe un año válido con 4 dígitos, por ejemplo: 1995 😊"}}]
         registration["birthYear"] = text.strip()
-        session["phase"] = "complete"
         sheet_error = None
         try:
             append_registration(registration, session["option"], identifier)
@@ -283,6 +346,19 @@ def collect_registration(session, text, identifier):
             sheet_error = str(error)
             app.logger.error("Google Sheets append failed: %s", sheet_error)
 
+        if session["option"] == "wellness":
+            try:
+                slots = get_wellness_slots()
+            except Exception as error:
+                app.logger.error("Wellness schedule fetch failed: %s", error)
+                slots = []
+            session["wellness_slots"] = slots
+            session["phase"] = "wellness_schedule"
+            if slots:
+                return [{"type": "text", "text": {"body": format_wellness_slots(slots)}}]
+            return [{"type": "text", "text": {"body": "Tu registro quedó guardado 🧘✨ No pude consultar los horarios disponibles. Escribe “Horarios” para intentarlo de nuevo, o continúa por WhatsApp: " + link_for("wellness")}}]
+
+        session["phase"] = "complete"
         link = link_for(session["option"])
         warning = "\n\nNota técnica: hubo un problema temporal al guardar el registro." if sheet_error else ""
         completion = prompts["complete"].format(name=registration["name"], warning=warning, link=link)
@@ -356,6 +432,44 @@ def process_incoming(text, selected_id, phone):
 
     if session["phase"].startswith("register_"):
         return collect_registration(session, text, phone)
+
+    if session["phase"] == "wellness_schedule":
+        if normalize(text) in {"horarios", "horario", "disponibles", "ver horarios"}:
+            try:
+                slots = get_wellness_slots()
+                session["wellness_slots"] = slots
+                return [{"type": "text", "text": {"body": format_wellness_slots(slots)}}]
+            except Exception as error:
+                app.logger.error("Wellness schedule refresh failed: %s", error)
+                return [{"type": "text", "text": {"body": "No pude refrescar la agenda Wellness ahora mismo. Inténtalo otra vez en un momento o escríbeme “Horarios”."}}]
+
+        slots = session.get("wellness_slots", [])
+        slot = find_wellness_slot(text, slots)
+        if not slot:
+            try:
+                slots = get_wellness_slots()
+                session["wellness_slots"] = slots
+            except Exception:
+                slots = session.get("wellness_slots", [])
+            return [{"type": "text", "text": {"body": "Ese horario no está disponible o no reconocí el día y hora. Aquí tienes las opciones libres, sin perder la calma 🧘"}}, {"type": "text", "text": {"body": format_wellness_slots(slots)}}]
+
+        try:
+            result = reserve_wellness_slot(slot, session["registration"], phone)
+            if not result.get("ok"):
+                raise RuntimeError(result.get("error", "reservation_failed"))
+        except Exception as error:
+            app.logger.error("Wellness reservation failed: %s", error)
+            try:
+                slots = get_wellness_slots()
+                session["wellness_slots"] = slots
+            except Exception:
+                slots = session.get("wellness_slots", [])
+            return [{"type": "text", "text": {"body": "Ese horario acaba de ocuparse o no pude apartarlo. Te comparto los disponibles actuales para que elijas otro momento 😊"}}, {"type": "text", "text": {"body": format_wellness_slots(slots)}}]
+
+        session["phase"] = "complete"
+        link = link_for("wellness")
+        schedule_idle_farewell(phone, "wellness")
+        return [{"type": "text", "text": {"body": f"¡Listo, {session['registration']['name']}! Tu cita Wellness quedó apartada para {slot['day']} a las {slot['time']} 🧘✨ Guarda ese momento para ti.\n\nSi necesitas cambiarla o confirmar algún detalle, escríbenos por WhatsApp:\n{link}"}}]
 
     if session["phase"] == "complete":
         link = link_for(session["option"])

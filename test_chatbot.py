@@ -2,7 +2,11 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app import append_registration, process_incoming, get_session, send_meta_messages, registration_prompts, idle_farewell_for_option, cancel_idle_farewell, schedule_idle_farewell
+from app import (append_registration, process_incoming, get_session,
+                  send_meta_messages, registration_prompts,
+                  idle_farewell_for_option, cancel_idle_farewell,
+                  schedule_idle_farewell, find_wellness_slot,
+                  format_wellness_slots)
 
 
 class MetaSendTests(unittest.TestCase):
@@ -230,6 +234,21 @@ class ChatbotTests(unittest.TestCase):
             schedule_idle_farewell(phone, "guadalupe")
             cancel_idle_farewell(phone)
             timer_class.return_value.cancel.assert_called_once()
+
+
+class WellnessScheduleTests(unittest.TestCase):
+    def test_find_wellness_slot(self):
+        slots = [{"day": "Martes", "time": "12:00-13:00", "row": 2}, {"day": "Miercoles", "time": "13:00-14:00", "row": 3}]
+        slot = find_wellness_slot("Martes 12:00", slots)
+        self.assertEqual(slot["day"], "Martes")
+
+    def test_format_wellness_slots(self):
+        text = format_wellness_slots([
+            {"day": "Martes", "time": "12:00-13:00", "row": 2},
+            {"day": "Jueves", "time": "18:00-19:00", "row": 8},
+        ])
+        self.assertIn("Martes", text)
+        self.assertIn("Jueves", text)
 
 
 if __name__ == "__main__":

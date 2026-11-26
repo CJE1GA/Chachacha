@@ -1,0 +1,113 @@
+// 1. Agrega estos dos casos dentro de doPost después de parsePayload y validación del token:
+
+if (payload.action === 'list_wellness_slots') {
+  return jsonResponse(listWellnessSlots_());
+}
+
+if (payload.action === 'reserve_wellness_slot') {
+  return jsonResponse(reserveWellnessSlot_(payload));
+}
+
+// 2. Agrega estas funciones al final del Apps Script:
+
+function listWellnessSlots_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Wellness');
+  if (!sheet) return { ok: false, error: 'missing_wellness_sheet' };
+
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+  if (lastRow < 2 || lastColumn < 4) return { ok: true, slots: [] };
+
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  const timeIndex = findHeader_(headers, 'hora');
+  const dayColumns = {
+    Martes: findHeader_(headers, 'martes'),
+    Miercoles: findHeader_(headers, 'miercoles'),
+    Jueves: findHeader_(headers, 'jueves'),
+  };
+
+  if (timeIndex < 0) return { ok: false, error: 'missing_hora_column' };
+
+  const values = sheet.getRange(2, 1, lastRow - 1, lastColumn).getValues();
+  const slots = [];
+
+  values.forEach(function(row, index) {
+    const timeValue = normalizeValue(row[timeIndex]);
+    if (!timeValue) return;
+
+    Object.keys(dayColumns).forEach(function(day) {
+      const columnIndex = dayColumns[day];
+      if (columnIndex < 0) return;
+      if (!normalizeValue(row[columnIndex])) {
+        slots.push({ day: day, time: timeValue, row: index + 2 });
+      }
+    });
+  });
+
+  return { ok: true, slots: slots };
+}
+
+function reserveWellnessSlot_(payload) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Wellness');
+  if (!sheet) return { ok: false, error: 'missing_wellness_sheet' };
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const timeColumn = findHeader_(headers, 'hora') + 1;
+  const dayColumn = findHeader_(headers, payload.day) + 1;
+
+  if (timeColumn <= 0 || dayColumn <= 0) {
+    return { ok: false, error: 'missing_wellness_column' };
+  }
+
+  let targetRow = Number(payload.row);
+  const requestedTime = normalizeValue(payload.time);
+
+  if (!targetRow || targetRow < 2) {
+    const lastRow = sheet.getLastRow();
+    for (let row = 2; row <= lastRow; row += 1) {
+      if (normalizeValue(sheet.getRange(row, timeColumn).getValue()) === requestedTime) {
+        targetRow = row;
+        break;
+      }
+    }
+  }
+
+  if (!targetRow) return { ok: false, error: 'slot_not_found' };
+
+  if (normalizeValue(sheet.getRange(targetRow, timeColumn).getValue()) !== requestedTime) {
+    return { ok: false, error: 'slot_not_found' };
+  }
+
+  const cell = sheet.getRange(targetRow, dayColumn);
+  if (normalizeValue(cell.getValue())) {
+    return { ok: false, error: 'slot_occupied' };
+  }
+
+  const name = normalizeValue((payload.lead || {}).name);
+  if (!name) return { ok: false, error: 'missing_name' };
+
+  cell.setValue(name);
+  return {
+    ok: true,
+    booked: true,
+    day: normalizeValue(payload.day),
+    time: requestedTime,
+    name: name,
+  };
+}
+
+function findHeader_(headers, name) {
+  const target = normalizeHeader_(name);
+  for (let index = 0; index < headers.length; index += 1) {
+    if (normalizeHeader_(headers[index]) === target) return index;
+  }
+  return -1;
+}
+
+function normalizeHeader_(value) {
+  return normalizeValue(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
