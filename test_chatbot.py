@@ -6,7 +6,8 @@ from app import (append_registration, process_incoming, get_session,
                   send_meta_messages, registration_prompts,
                   idle_farewell_for_option, cancel_idle_farewell,
                   schedule_idle_farewell, find_wellness_slot,
-                  format_wellness_slots)
+                  format_wellness_slots, is_unsupported_wellness_action,
+                  wellness_schedule_fallback)
 
 
 class MetaSendTests(unittest.TestCase):
@@ -235,6 +236,16 @@ class ChatbotTests(unittest.TestCase):
             cancel_idle_farewell(phone)
             timer_class.return_value.cancel.assert_called_once()
 
+    def test_unsupported_wellness_action(self):
+        self.assertTrue(is_unsupported_wellness_action(RuntimeError("unsupported_action")))
+        self.assertFalse(is_unsupported_wellness_action(RuntimeError("slot_occupied")))
+
+    def test_wellness_schedule_fallback(self):
+        fallback_message = wellness_schedule_fallback()
+        self.assertIn("Lo siento", fallback_message)
+        self.assertIn("bienestar", fallback_message)
+        self.assertIn("agendar", fallback_message)
+
 
 class WellnessScheduleTests(unittest.TestCase):
     def test_find_wellness_slot(self):
@@ -249,6 +260,12 @@ class WellnessScheduleTests(unittest.TestCase):
         ])
         self.assertIn("Martes", text)
         self.assertIn("Jueves", text)
+
+    def test_unsupported_action_fallback(self):
+        self.assertTrue(is_unsupported_wellness_action(RuntimeError("unsupported_action")))
+        message = wellness_schedule_fallback()
+        self.assertIn("agenda automática", message)
+        self.assertIn("WhatsApp", message)
 
 
 if __name__ == "__main__":

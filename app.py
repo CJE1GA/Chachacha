@@ -351,12 +351,17 @@ def collect_registration(session, text, identifier):
                 slots = get_wellness_slots()
             except Exception as error:
                 app.logger.error("Wellness schedule fetch failed: %s", error)
-                slots = []
+                session["phase"] = "complete"
+                schedule_idle_farewell(phone, "wellness")
+                return [{"type": "text", "text": {"body": wellness_schedule_fallback()}}]
+
             session["wellness_slots"] = slots
             session["phase"] = "wellness_schedule"
             if slots:
                 return [{"type": "text", "text": {"body": format_wellness_slots(slots)}}]
-            return [{"type": "text", "text": {"body": "Tu registro quedó guardado 🧘✨ No pude consultar los horarios disponibles. Escribe “Horarios” para intentarlo de nuevo, o continúa por WhatsApp: " + link_for("wellness")}}]
+            session["phase"] = "complete"
+            schedule_idle_farewell(phone, "wellness")
+            return [{"type": "text", "text": {"body": wellness_schedule_fallback()}}]
 
         session["phase"] = "complete"
         link = link_for(session["option"])
@@ -441,7 +446,9 @@ def process_incoming(text, selected_id, phone):
                 return [{"type": "text", "text": {"body": format_wellness_slots(slots)}}]
             except Exception as error:
                 app.logger.error("Wellness schedule refresh failed: %s", error)
-                return [{"type": "text", "text": {"body": "No pude refrescar la agenda Wellness ahora mismo. Inténtalo otra vez en un momento o escríbeme “Horarios”."}}]
+                session["phase"] = "complete"
+                schedule_idle_farewell(phone, "wellness")
+                return [{"type": "text", "text": {"body": wellness_schedule_fallback()}}]
 
         slots = session.get("wellness_slots", [])
         slot = find_wellness_slot(text, slots)
@@ -459,6 +466,10 @@ def process_incoming(text, selected_id, phone):
                 raise RuntimeError(result.get("error", "reservation_failed"))
         except Exception as error:
             app.logger.error("Wellness reservation failed: %s", error)
+            if is_unsupported_wellness_action(error):
+                session["phase"] = "complete"
+                schedule_idle_farewell(phone, "wellness")
+                return [{"type": "text", "text": {"body": wellness_schedule_fallback()}}]
             try:
                 slots = get_wellness_slots()
                 session["wellness_slots"] = slots
@@ -473,7 +484,7 @@ def process_incoming(text, selected_id, phone):
 
     if session["phase"] == "complete":
         link = link_for(session["option"])
-        return [{"type": "text", "text": {"body": f"Ya quedó tu registro en modo “lista para entrenar” 😄 Para confirmar disponibilidad, precios o resolver cualquier duda, escríbemeos por WhatsApp:\n{link}"}}]
+        return [{"type": "text", "text": {"body": f"Ya quedó tu registro en modo “lista para entrenar” 😄 Para confirmar disponibilidad, precios o resolver cualquier duda, escríbenos por WhatsApp:\n{link}"}}]
 
     link = link_for(session["option"])
     return [{"type": "text", "text": {"body": "No pasa nada 😊 Si quieres podemos seguir desde el inicio escribiendo “Inicio”, o te llevo directo con nuestro equipo por WhatsApp:"}}, {"type": "text", "text": {"body": link}}]
@@ -825,3 +836,10 @@ def registration_prompts(option):
         "birthYear": "¿Cuál es tu año de nacimiento? Escríbelo con 4 dígitos, por ejemplo: 1995.",
         "complete": "¡Listo, {name}! Tu registro quedó completado. La siguiente meta es verte a Full entrenando.{warning}\n\nConfirma los detalles por WhatsApp:\n{link}",
     }
+
+def is_unsupported_wellness_action(error):
+    return "unsupported_action" in str(error).lower()
+
+
+def wellness_schedule_fallback():
+    return "Lo siento: tu registro Wellness quedó guardado 🧘✨ Para cuidar tu bienestar, la agenda automática aún no está habilitada en Google Sheets. Escríbenos por WhatsApp para agendar tu horario ideal: " + link_for("wellness")
