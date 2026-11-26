@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app import append_registration, process_incoming, get_session, send_meta_messages, registration_prompts
+from app import append_registration, process_incoming, get_session, send_meta_messages, registration_prompts, idle_farewell_for_option, cancel_idle_farewell, schedule_idle_farewell
 
 
 class MetaSendTests(unittest.TestCase):
@@ -215,6 +215,21 @@ class ChatbotTests(unittest.TestCase):
         result = process_incoming("Cambiar a Wellness", "wellness", phone)
         self.assertIn("rincón Wellness", result[0]["text"]["body"])
         self.assertEqual(result[1]["interactive"]["action"]["buttons"][0]["reply"]["id"], "agendar_cita_wellness")
+
+    def test_idle_farewells_are_option_specific(self):
+        wellness = idle_farewell_for_option("wellness")
+        guadalupe = idle_farewell_for_option("guadalupe")
+        santa_anita = idle_farewell_for_option("santa_anita")
+        self.assertIn("Wellness", wellness)
+        self.assertIn("Guadalupe", guadalupe)
+        self.assertIn("Santa Anita", santa_anita)
+
+    def test_cancel_idle_farewell(self):
+        phone = "test-cancel-farewell"
+        with patch("app.threading.Timer") as timer_class:
+            schedule_idle_farewell(phone, "guadalupe")
+            cancel_idle_farewell(phone)
+            timer_class.return_value.cancel.assert_called_once()
 
 
 if __name__ == "__main__":

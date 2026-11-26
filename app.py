@@ -29,7 +29,47 @@ for label, url in re.findall(r'(Guadalupe|Santa Anita|Wellness):\s*"([^"]+)"', l
 
 sessions = {}
 seen_webhook_messages = set()
+idle_timers = {}
 sessions_lock = threading.Lock()
+
+
+def cancel_idle_farewell(phone):
+    timer = idle_timers.pop(phone, None)
+    if timer:
+        timer.cancel()
+
+
+def idle_farewell_for_option(option):
+    if option == "wellness":
+        return "Tu cita Wellness quedó en camino 🧘✨ Cuando quieras volver, aquí estaremos con calma y buena vibra. ¡Hasta pronto!"
+    if option == "santa_anita":
+        return "¡Listo, guerrero! Te esperamos en Bosque Santa Anita con tenis puestos y buena actitud 💪🏋️ ¡Nos vemos entrenando!"
+    if option == "guadalupe":
+        return "¡Dale, guerrero! Guadalupe ya tiene ganas de verte entrenar 🔥 Que le ganes a las excusas y nos vemos a Full 💪"
+    if option == "hyrox":
+        return "¡Reta tus límites! HYROX está listo para ti ⚡ Cuando quieras volver, seguimos en la zona de combate 😄"
+    return "Gracias por conversar con Full Training 💪 Fue un gusto ayudarte. ¡Aquí estaremos cuando quieras dar el siguiente paso!"
+
+
+def schedule_idle_farewell(phone, option):
+    cancel_idle_farewell(phone)
+
+    def send_farewell():
+        with sessions_lock:
+            current = sessions.get(phone)
+            if current is None or current.get("phase") != "complete" or current.get("option") != option:
+                idle_timers.pop(phone, None)
+                return
+            idle_timers.pop(phone, None)
+        try:
+            send_meta_messages(phone, [{"type": "text", "text": {"body": idle_farewell_for_option(option)}}])
+        except Exception:
+            app.logger.exception("Could not send idle farewell")
+
+    timer = threading.Timer(30.0, send_farewell)
+    idle_timers[phone] = timer
+    timer.daemon = True
+    timer.start()
 
 
 def meta_access_token():
@@ -246,11 +286,13 @@ def collect_registration(session, text, identifier):
         link = link_for(session["option"])
         warning = "\n\nNota técnica: hubo un problema temporal al guardar el registro." if sheet_error else ""
         completion = prompts["complete"].format(name=registration["name"], warning=warning, link=link)
+        schedule_idle_farewell(identifier, session["option"])
         return [{"type": "text", "text": {"body": completion}}]
     return [{"type": "text", "text": {"body": "No entendí tu respuesta. Podemos empezar de nuevo con “Inicio”."}}]
 
 
 def process_incoming(text, selected_id, phone):
+    cancel_idle_farewell(phone)
     session = get_session(phone)
     text = (text or "").strip()
 
