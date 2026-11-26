@@ -7,7 +7,7 @@ from app import (append_registration, process_incoming, get_session,
                   idle_farewell_for_option, cancel_idle_farewell,
                   schedule_idle_farewell, find_wellness_slot,
                   format_wellness_slots, is_unsupported_wellness_action,
-                  wellness_schedule_fallback)
+                  wellness_schedule_fallback, wellness_slot_start_time)
 
 
 class MetaSendTests(unittest.TestCase):
@@ -253,6 +253,9 @@ class WellnessScheduleTests(unittest.TestCase):
         slot = find_wellness_slot("Martes 12:00", slots)
         self.assertEqual(slot["day"], "Martes")
 
+        jueves = find_wellness_slot("Jueves 15:00", [{"day": "Jueves", "time": "15:00-16:00", "row": 5}])
+        self.assertEqual(jueves["time"], "15:00-16:00")
+
     def test_format_wellness_slots(self):
         text = format_wellness_slots([
             {"day": "Martes", "time": "12:00-13:00", "row": 2},
@@ -266,6 +269,12 @@ class WellnessScheduleTests(unittest.TestCase):
         message = wellness_schedule_fallback()
         self.assertIn("agenda automática", message)
         self.assertIn("WhatsApp", message)
+
+    def test_wellness_range_displays_start_time_only(self):
+        self.assertEqual(wellness_slot_start_time("13:00-14:00"), "13:00")
+        text = format_wellness_slots([{"day": "Martes", "time": "13:00-14:00", "row": 3}])
+        self.assertIn("13:00", text)
+        self.assertNotIn("14:00", text)
 
 
 if __name__ == "__main__":

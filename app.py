@@ -41,7 +41,7 @@ def cancel_idle_farewell(phone):
 
 def idle_farewell_for_option(option):
     if option == "wellness":
-        return "Tu cita Wellness quedó en camino 🧘✨ Cuando quieras volver, aquí estaremos con calma y buena vibra. ¡Hasta pronto!"
+        return "Tu cita Wellness quedó hecha 🧘✨ Cuando quieras volver, aquí estaremos con calma y buena vibra. ¡Hasta pronto!"
     if option == "santa_anita":
         return "¡Listo, guerrero! Te esperamos en Bosque Santa Anita con tenis puestos y buena actitud 💪🏋️ ¡Nos vemos entrenando!"
     if option == "guadalupe":
@@ -249,12 +249,17 @@ def reserve_wellness_slot(slot, registration, identifier):
     )
 
 
+def wellness_slot_start_time(time_value):
+    text = str(time_value or "").strip()
+    return text.split("-")[0].strip() if "-" in text else text
+
+
 def format_wellness_slots(slots):
     if not slots:
         return "Por ahora no quedan horarios Wellness disponibles."
     grouped = {}
     for slot in slots:
-        grouped.setdefault(slot["day"], []).append(slot["time"])
+        grouped.setdefault(slot["day"], []).append(wellness_slot_start_time(slot["time"]))
     lines = ["Estos son los horarios Wellness disponibles, a tu ritmo 🧘✨"]
     for day, times in grouped.items():
         lines.append(f"{day}: " + " | ".join(times))
@@ -433,7 +438,7 @@ def process_incoming(text, selected_id, phone):
         if not wants_appointment:
             return [{"type": "text", "text": {"body": "Sin estrés: toca “Quiero agendar cita” o escríbeme “Quiero agendar cita” y te doy el siguiente paso."}}, wellness_appointment_menu()]
         session["phase"] = "register_name"
-        return [{"type": "text", "text": {"body": "¡Cita en camino! Para apartarla con calma, ¿cuál es tu nombre completo?"}}]
+        return [{"type": "text", "text": {"body": "¡Vamos con tu cita! Para apartarla con calma, ¿cuál es tu nombre completo?"}}]
 
     if session["phase"].startswith("register_"):
         return collect_registration(session, text, phone)
@@ -480,7 +485,7 @@ def process_incoming(text, selected_id, phone):
         session["phase"] = "complete"
         link = link_for("wellness")
         schedule_idle_farewell(phone, "wellness")
-        return [{"type": "text", "text": {"body": f"¡Listo, {session['registration']['name']}! Tu cita Wellness quedó apartada para {slot['day']} a las {slot['time']} 🧘✨ Guarda ese momento para ti.\n\nSi necesitas cambiarla o confirmar algún detalle, escríbenos por WhatsApp:\n{link}"}}]
+        return [{"type": "text", "text": {"body": f"¡Listo, {session['registration']['name']}! Tu cita Wellness quedó apartada para {slot['day']} a las {wellness_slot_start_time(slot['time'])} 🧘✨ Guarda ese momento para ti.\n\nSi necesitas cambiarla o confirmar algún detalle, escríbenos por WhatsApp:\n{link}"}}]
 
     if session["phase"] == "complete":
         link = link_for(session["option"])
