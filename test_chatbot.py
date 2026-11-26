@@ -195,6 +195,13 @@ class ChatbotTests(unittest.TestCase):
         messages = process_incoming("Muchas gracias", None, phone)
         self.assertIn("Hasta tu cita", messages[0]["text"]["body"])
 
+    def test_guadalupe_can_switch_to_wellness(self):
+        phone = "test-guadalupe-wellness"
+        process_incoming("Guadalupe", None, phone)
+        result = process_incoming("Cambiar a Wellness", "wellness", phone)
+        self.assertIn("rincón Wellness", result[0]["text"]["body"])
+        self.assertEqual(result[1]["interactive"]["action"]["buttons"][0]["reply"]["id"], "agendar_cita_wellness")
+
 
 if __name__ == "__main__":
     unittest.main()

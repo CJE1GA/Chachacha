@@ -211,28 +211,28 @@ def collect_registration(session, text, identifier):
 
     if phase == "register_name":
         if not valid_name(text):
-            return [{"type": "text", "text": {"body": "Necesito tu nombre completo (nombre y apellido). Ejemplo: Ana López."}}]
+            return [{"type": "text", "text": {"body": "¡Tranquil@! Necesito tu nombre completo con nombre y apellido, por ejemplo: Ana López 😊"}}]
         registration["name"] = text.strip()
         session["phase"] = "register_phone"
         return [{"type": "text", "text": {"body": "¿Cuál es tu número de teléfono? Puedes escribirlo con lada."}}]
 
     if phase == "register_phone":
         if not valid_phone(text):
-            return [{"type": "text", "text": {"body": "Ese teléfono no parece válido. Escríbelo con entre 8 y 15 dígitos."}}]
+            return [{"type": "text", "text": {"body": "Ese teléfono casi llega, pero necesito entre 8 y 15 dígitos. Puedes ponerlo con lada y sin espacios 😊"}}]
         registration["phone"] = text.strip()
         session["phase"] = "register_email"
-        return [{"type": "text", "text": {"body": "Ahora necesito tu correo electrónico."}}]
+        return [{"type": "text", "text": {"body": "Ahora, ¿me compartes tu correo electrónico? Ejemplo: nombre@dominio.com ✉️"}}]
 
     if phase == "register_email":
         if not valid_email(text):
-            return [{"type": "text", "text": {"body": "Revisa el correo, por favor. Debe tener este formato: nombre@dominio.com"}}]
+            return [{"type": "text", "text": {"body": "Ese correo no parece completo. Escríbelo así: nombre@dominio.com, sin espacios 😊"}}]
         registration["email"] = text.strip().lower()
         session["phase"] = "register_birthYear"
         return [{"type": "text", "text": {"body": "¿Cuál es tu año de nacimiento? Escríbelo con 4 dígitos, por ejemplo: 1995."}}]
 
     if phase == "register_birthYear":
         if not valid_birth_year(text):
-            return [{"type": "text", "text": {"body": "Escribe un año de nacimiento válido con 4 dígitos."}}]
+            return [{"type": "text", "text": {"body": "¡Ya casi terminamos! Escribe un año válido con 4 dígitos, por ejemplo: 1995 😊"}}]
         registration["birthYear"] = text.strip()
         session["phase"] = "complete"
         sheet_error = None
@@ -290,9 +290,15 @@ def process_incoming(text, selected_id, phone):
         return enter_option(session, phone)
 
     if session["phase"] == "offer_sample":
+        if selected_id == "wellness" or match_option(text) == "wellness":
+            session["option"] = "wellness"
+            return enter_option(session, phone)
+
         wants_sample = selected_id == "clase_muestra" or normalize(text) in {"quiero mi clase muestra", "quiero clase muestra", "clase muestra", "si", "sí", "quiero", "me interesa"}
         if not wants_sample:
-            return [{"type": "text", "text": {"body": "Te doy dos opciones claras: toca el botón para reservar tu clase muestra o dime “Quiero mi clase muestra”."}}, sample_class_menu()]
+            if session["option"] == "guadalupe":
+                return [{"type": "text", "text": {"body": "¡Claro! Puedes elegir una clase muestra o cambiarte a Wellness. Tú decides con calma 😄"}}, guadalupe_switch_menu()]
+            return [{"type": "text", "text": {"body": "¡Claro! Toca el botón para reservar tu clase muestra o dime “Quiero mi clase muestra” 😄"}}, sample_class_menu()]
         session["phase"] = "register_name"
         return [{"type": "text", "text": {"body": "¡Perfecto! Vamos a registrar tu clase muestra. ¿Cuál es tu nombre completo?"}}]
 
@@ -311,7 +317,7 @@ def process_incoming(text, selected_id, phone):
         return [{"type": "text", "text": {"body": f"Ya quedó tu registro en modo “lista para entrenar” 😄 Para confirmar disponibilidad, precios o resolver cualquier duda, escríbenos por WhatsApp:\n{link}"}}]
 
     link = link_for(session["option"])
-    return [{"type": "text", "text": {"body": "No tengo esa respuesta registrada, pero sí tengo el camino directo a nuestro equipo. Escríbenos por WhatsApp:"}}, {"type": "text", "text": {"body": link}}]
+    return [{"type": "text", "text": {"body": "No pasa nada 😊 Si quieres podemos seguir desde el inicio escribiendo “Inicio”, o te llevo directo con nuestro equipo por WhatsApp:"}}, {"type": "text", "text": {"body": link}}]
 
 
 @app.get("/health")
@@ -613,5 +619,16 @@ def wellness_appointment_menu():
         "body": {"text": "¿List@ para una cita de Wellness?"},
         "action": {"buttons": [
             {"type": "reply", "reply": {"id": "agendar_cita_wellness", "title": "Quiero agendar cita"}}
+        ]}
+    }}
+
+
+def guadalupe_switch_menu():
+    return {"type": "interactive", "interactive": {
+        "type": "button",
+        "body": {"text": "¿Quieres entrenar con nosotros o recargar tu bienestar?"},
+        "action": {"buttons": [
+            {"type": "reply", "reply": {"id": "clase_muestra", "title": "Quiero clase muestra"}},
+            {"type": "reply", "reply": {"id": "wellness", "title": "Cambiar a Wellness"}}
         ]}
     }}
