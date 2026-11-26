@@ -208,27 +208,28 @@ def enter_option(session, phone):
 def collect_registration(session, text, identifier):
     phase = session["phase"]
     registration = session["registration"]
+    prompts = registration_prompts(session["option"])
 
     if phase == "register_name":
         if not valid_name(text):
             return [{"type": "text", "text": {"body": "¡Tranquil@! Necesito tu nombre completo con nombre y apellido, por ejemplo: Ana López 😊"}}]
         registration["name"] = text.strip()
         session["phase"] = "register_phone"
-        return [{"type": "text", "text": {"body": "¿Cuál es tu número de teléfono? Puedes escribirlo con lada."}}]
+        return [{"type": "text", "text": {"body": prompts["phone"]}}]
 
     if phase == "register_phone":
         if not valid_phone(text):
             return [{"type": "text", "text": {"body": "Ese teléfono casi llega, pero necesito entre 8 y 15 dígitos. Puedes ponerlo con lada y sin espacios 😊"}}]
         registration["phone"] = text.strip()
         session["phase"] = "register_email"
-        return [{"type": "text", "text": {"body": "Ahora, ¿me compartes tu correo electrónico? Ejemplo: nombre@dominio.com ✉️"}}]
+        return [{"type": "text", "text": {"body": prompts["email"]}}]
 
     if phase == "register_email":
         if not valid_email(text):
             return [{"type": "text", "text": {"body": "Ese correo no parece completo. Escríbelo así: nombre@dominio.com, sin espacios 😊"}}]
         registration["email"] = text.strip().lower()
         session["phase"] = "register_birthYear"
-        return [{"type": "text", "text": {"body": "¿Cuál es tu año de nacimiento? Escríbelo con 4 dígitos, por ejemplo: 1995."}}]
+        return [{"type": "text", "text": {"body": prompts["birthYear"]}}]
 
     if phase == "register_birthYear":
         if not valid_birth_year(text):
@@ -244,7 +245,8 @@ def collect_registration(session, text, identifier):
 
         link = link_for(session["option"])
         warning = "\n\nNota técnica: hubo un problema temporal al guardar el registro." if sheet_error else ""
-        return [{"type": "text", "text": {"body": f"¡Registro completado, {registration['name']}! 🔥 Ya estás un paso más cerca de tu mejor versión.{warning}\n\nPara confirmar tu clase o atención personalizada, escríbenos por WhatsApp:\n{link}"}}]
+        completion = prompts["complete"].format(name=registration["name"], warning=warning, link=link)
+        return [{"type": "text", "text": {"body": completion}}]
     return [{"type": "text", "text": {"body": "No entendí tu respuesta. Podemos empezar de nuevo con “Inicio”."}}]
 
 
@@ -300,7 +302,8 @@ def process_incoming(text, selected_id, phone):
                 return [{"type": "text", "text": {"body": "¡Claro! Puedes elegir una clase muestra o cambiarte a Wellness. Tú decides con calma 😄"}}, guadalupe_switch_menu()]
             return [{"type": "text", "text": {"body": "¡Claro! Toca el botón para reservar tu clase muestra o dime “Quiero mi clase muestra” 😄"}}, sample_class_menu()]
         session["phase"] = "register_name"
-        return [{"type": "text", "text": {"body": "¡Perfecto! Vamos a registrar tu clase muestra. ¿Cuál es tu nombre completo?"}}]
+        prompts = registration_prompts(session["option"])
+        return [{"type": "text", "text": {"body": prompts["name"]}}]
 
     if session["phase"] == "offer_wellness":
         wants_appointment = selected_id == "agendar_cita_wellness" or normalize(text) in {"quiero agendar cita", "agendar cita", "cita wellness", "si", "sí", "quiero", "me interesa"}
@@ -314,7 +317,7 @@ def process_incoming(text, selected_id, phone):
 
     if session["phase"] == "complete":
         link = link_for(session["option"])
-        return [{"type": "text", "text": {"body": f"Ya quedó tu registro en modo “lista para entrenar” 😄 Para confirmar disponibilidad, precios o resolver cualquier duda, escríbenos por WhatsApp:\n{link}"}}]
+        return [{"type": "text", "text": {"body": f"Ya quedó tu registro en modo “lista para entrenar” 😄 Para confirmar disponibilidad, precios o resolver cualquier duda, escríbemeos por WhatsApp:\n{link}"}}]
 
     link = link_for(session["option"])
     return [{"type": "text", "text": {"body": "No pasa nada 😊 Si quieres podemos seguir desde el inicio escribiendo “Inicio”, o te llevo directo con nuestro equipo por WhatsApp:"}}, {"type": "text", "text": {"body": link}}]
@@ -632,3 +635,37 @@ def guadalupe_switch_menu():
             {"type": "reply", "reply": {"id": "wellness", "title": "Cambiar a Wellness"}}
         ]}
     }}
+
+
+def registration_prompts(option):
+    if option == "wellness":
+        return {
+            "name": "🧘 Primero, ¿cómo te llamas? Escribe tu nombre completo para preparar tu momento de calma.",
+            "phone": "¿Cuál es el número donde podamos confirmar tu cita Wellness? Puedes ponerlo con lada 📲",
+            "email": "Ahora tu correo, para que tu cita Wellness quede bien guardadita ✉️ (ejemplo: nombre@dominio.com)",
+            "birthYear": "Por último, ¿cuál es tu año de nacimiento? Escríbelo con 4 dígitos, por ejemplo: 1995 🌿",
+            "complete": "Listo, {name}: tu espacio de Wellness ya tiene tu registro 🧘✨ Estamos preparando una experiencia con equilibrio, buena vibra y cero prisa.{warning}\n\nPara confirmar horario y atención personalizada, escríbenos por WhatsApp:\n{link}",
+        }
+    if option == "santa_anita":
+        return {
+            "name": "🏋️ ¡Dale! ¿Cuál es tu nombre completo? Así guardamos tu lugar en Bosque Santa Anita.",
+            "phone": "¿Cuál es tu número de teléfono con lada? Te daremos la ruta para que llegues a entrenar con toda la actitud 📲",
+            "email": "Ahora tu correo electrónico, sin sorpresas ni excusas: nombre@dominio.com ✉️",
+            "birthYear": "¿Cuál es tu año de nacimiento? Escríbelo con 4 dígitos, por ejemplo: 1995 🗓️",
+            "complete": "¡{name}, quedaste registrado para meterle energía en Bosque Santa Anita! 💪 La próxima meta es verte llegar con tenis listos y sonrisa ganadora.{warning}\n\nConfirma detalles de tu clase muestra por WhatsApp:\n{link}",
+        }
+    if option == "guadalupe":
+        return {
+            "name": "🔥 ¿Cuál es tu nombre completo? Vamos a ponerle nombre a tu próxima versión “Full”.",
+            "phone": "¿Cuál es tu número de teléfono con lada? Lo usaremos para confirmar tu clase en Guadalupe y evitar que el banco te haga ejercicio primero 📲😄",
+            "email": "Compárteme tu correo electrónico, por ejemplo: nombre@dominio.com ✉️",
+            "birthYear": "Último dato: tu año de nacimiento con 4 dígitos, por ejemplo: 1995 🗓️",
+            "complete": "¡Eso, {name}! Tu registro en Guadalupe está listo 🔥 Prepárate para sudar, superarte y conquistar mañana las escaleras.{warning}\n\nConfirma tu clase muestra por WhatsApp:\n{link}",
+        }
+    return {
+        "name": "💪 ¿Cuál es tu nombre completo? Vamos a preparar tu registro.",
+        "phone": "¿Cuál es tu número de teléfono con lada?",
+        "email": "Compárteme tu correo electrónico, por ejemplo: nombre@dominio.com ✉️",
+        "birthYear": "¿Cuál es tu año de nacimiento? Escríbelo con 4 dígitos, por ejemplo: 1995.",
+        "complete": "¡Listo, {name}! Tu registro quedó completado. La siguiente meta es verte a Full entrenando.{warning}\n\nConfirma los detalles por WhatsApp:\n{link}",
+    }

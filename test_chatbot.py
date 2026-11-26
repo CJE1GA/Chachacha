@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app import append_registration, process_incoming, get_session, send_meta_messages
+from app import append_registration, process_incoming, get_session, send_meta_messages, registration_prompts
 
 
 class MetaSendTests(unittest.TestCase):
@@ -48,6 +48,20 @@ class MetaSendTests(unittest.TestCase):
         quick_replies = kwargs["json"]["message"]["quick_replies"]
         self.assertEqual(quick_replies[0]["payload"], "clase_muestra")
         self.assertLessEqual(len(quick_replies[0]["title"]), 20)
+
+
+class RegistrationPromptTests(unittest.TestCase):
+    def test_wellness_prompts_are_specific(self):
+        prompts = registration_prompts("wellness")
+        self.assertIn("calma", prompts["name"].lower())
+        self.assertIn("cita", prompts["phone"].lower())
+        self.assertIn("equilibrio", prompts["complete"].lower())
+
+    def test_branch_prompts_are_specific(self):
+        guadalupe = registration_prompts("guadalupe")
+        santa_anita = registration_prompts("santa_anita")
+        self.assertIn("Guadalupe", guadalupe["complete"])
+        self.assertIn("Bosque Santa Anita", santa_anita["complete"])
 
 
 class GoogleSheetsTests(unittest.TestCase):
