@@ -276,6 +276,24 @@ class WellnessScheduleTests(unittest.TestCase):
         self.assertIn("13:00", text)
         self.assertNotIn("14:00", text)
 
+    def test_find_wellness_slot_uses_exact_hour(self):
+        slots = [
+            {"day": "Martes", "time": "16:00-17:00", "row": 2},
+            {"day": "Martes", "time": "17:00-18:00", "row": 3},
+        ]
+        slot = find_wellness_slot("Martes 17:00", slots)
+        self.assertEqual(slot["time"], "17:00-18:00")
+        self.assertEqual(slot["row"], 3)
+
+    def test_find_wellness_slot_uses_exact_hour_for_thursday(self):
+        slots = [
+            {"day": "Jueves", "time": "17:00-18:00", "row": 7},
+            {"day": "Jueves", "time": "18:00-19:00", "row": 8},
+        ]
+        slot = find_wellness_slot("Jueves 18:00", slots)
+        self.assertEqual(slot["time"], "18:00-19:00")
+        self.assertEqual(slot["row"], 8)
+
 
 if __name__ == "__main__":
     unittest.main()

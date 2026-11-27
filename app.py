@@ -267,18 +267,55 @@ def format_wellness_slots(slots):
     return "\n".join(lines)
 
 
+def wellness_time_minutes(time_value):
+    """Convierte exactamente la hora de inicio de una cita Wellness a minutos."""
+    text = str(time_value or "").strip().lower()
+
+    # Hora de inicio de un rango con AM/PM: "6:00 PM - 7:00 PM".
+    ampm_match = re.search(r"\b([01]?\d):([0-5]\d)\s*(a\.?m\.?|p\.?m\.?)\b", text)
+    if ampm_match:
+        hour = int(ampm_match.group(1))
+        minutes = int(ampm_match.group(2))
+        suffix = ampm_match.group(3).replace(".", "")
+        if suffix == "pm" and hour != 12:
+            hour += 12
+        if suffix == "am" and hour == 12:
+            hour = 0
+        return hour * 60 + minutes
+
+    # Hora de inicio en formato 24 horas: "18:00-19:00" o "18:00:00".
+    start = wellness_slot_start_time(text)
+    twenty_four_hour = re.search(r"\b([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\b", start)
+    if twenty_four_hour:
+        hour = int(twenty_four_hour.group(1))
+        minutes = int(twenty_four_hour.group(2))
+        return hour * 60 + minutes
+
+    return None
+
+
 def find_wellness_slot(text, slots):
     normalized_text = normalize(text)
-    compact_text = re.sub(r"[^0-9]", "", text)
+    requested_minutes = wellness_time_minutes(text)
 
     for slot in slots:
         day = normalize(slot["day"])
-        slot_time = str(slot["time"]).strip()
-        compact_slot_time = re.sub(r"[^0-9]", "", slot_time)
         if day not in normalized_text:
             continue
-        if compact_text and (compact_text in compact_slot_time or compact_slot_time.startswith(compact_text)):
+
+        if requested_minutes is not None:
+            slot_minutes = wellness_time_minutes(slot["time"])
+            if slot_minutes == requested_minutes:
+                return slot
+            continue
+
+        # Respaldo para formatos sin hora válida: compara el inicio exacto normalizado.
+        requested_compact = re.sub(r"[^0-9]", "", wellness_slot_start_time(text))
+        slot_start = wellness_slot_start_time(slot["time"])
+        slot_compact = re.sub(r"[^0-9]", "", slot_start)
+        if requested_compact and requested_compact == slot_compact:
             return slot
+
     return None
 
 
@@ -357,7 +394,7 @@ def collect_registration(session, text, identifier):
             except Exception as error:
                 app.logger.error("Wellness schedule fetch failed: %s", error)
                 session["phase"] = "complete"
-                schedule_idle_farewell(phone, "wellness")
+                schedule_idle_farewell(identifier, "wellness")
                 return [{"type": "text", "text": {"body": wellness_schedule_fallback()}}]
 
             session["wellness_slots"] = slots
@@ -365,7 +402,7 @@ def collect_registration(session, text, identifier):
             if slots:
                 return [{"type": "text", "text": {"body": format_wellness_slots(slots)}}]
             session["phase"] = "complete"
-            schedule_idle_farewell(phone, "wellness")
+            schedule_idle_farewell(identifier, "wellness")
             return [{"type": "text", "text": {"body": wellness_schedule_fallback()}}]
 
         session["phase"] = "complete"
